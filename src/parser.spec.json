@@ -80,15 +80,13 @@
         "exchanges": {
             "defined.exchange": {
                 "type": "fanout",
-                "bindings": {
-                    "queues": {
-                        "defined.queue": {
-                            "durable": true,
-                            "patterns": [ "*.message" ],
-                            "deadLetterExchange": {
-                                "name": "defined.dlx",
-                                "type": "fanout"
-                            }
+                "queues": {
+                    "defined.queue": {
+                        "durable": true,
+                        "patterns": [ "*.message" ],
+                        "deadLetterExchange": {
+                            "name": "defined.dlx",
+                            "type": "fanout"
                         }
                     }
                 }
@@ -99,13 +97,11 @@
         "exchanges": {
             "defined.exchange": {
                 "type": "fanout",
-                "bindings": {
-                    "exchanges": {
-                        "defined.exchange.topic": {
-                            "type": "topic",
-                            "durable": true,
-                            "patterns": [ "#" ]
-                        }
+                "exchanges": {
+                    "defined.exchange.topic": {
+                        "type": "topic",
+                        "durable": true,
+                        "patterns": [ "#" ]
                     }
                 }
             }
@@ -125,14 +121,12 @@
             "nested": {
                 "name": "nested.exchange",
                 "type": "fanout",
-                "bindings": {
-                    "queues": {
-                        "ingress": {
-                            "name": "ingress.queue",
-                            "patterns": [ "#" ]
-                        },
-                        "simple": "simple.queue"
-                    }
+                "queues": {
+                    "ingress": {
+                        "name": "ingress.queue",
+                        "patterns": [ "#" ]
+                    },
+                    "simple": "simple.queue"
                 }
             }
         }

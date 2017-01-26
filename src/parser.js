@@ -60,12 +60,12 @@ module.exports = ( definition ) => {
 				return { exchange: exchange.name, target, patterns: defn.patterns || [ "" ] };
 			};
 
-			_.forEach( _.get( def, "bindings.queues", {} ), ( value, key ) => {
+			_.forEach( _.get( def, "queues", {} ), ( value, key ) => {
 				const binding = convertBinding( value, key );
 				api.ensureBinding( "queue", key, binding );
 			} );
 
-			_.forEach( _.get( def, "bindings.exchanges", {} ), ( value, key ) => {
+			_.forEach( _.get( def, "exchanges", {} ), ( value, key ) => {
 				const binding = convertBinding( value, key );
 				api.ensureBinding( "exchange", key, binding );
 			} );
