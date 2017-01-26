@@ -179,6 +179,76 @@ describe( "topologyParser", () => {
 		} );
 	} );
 
+	context( "parsing subscriptions", () => {
+		beforeEach( () => {
+			topology = parser( data.subscriptions );
+		} );
+
+		it( "should create the subscription exchange", () => {
+			assert.deepProperty( topology.exchanges, "subscription\\.exchange" );
+			assert.deepEqual( topology.exchanges[ "subscription.exchange" ], {
+				name: "subscription.exchange",
+				type: "fanout"
+			} );
+		} );
+
+		it( "should create the topic exchange", () => {
+			assert.deepProperty( topology.exchanges, "topic\\.exchange" );
+			assert.deepEqual( topology.exchanges[ "topic.exchange" ], {
+				name: "topic.exchange",
+				type: "topic"
+			} );
+		} );
+
+		it( "should create the exchange bindings", () => {
+			assert.deepEqual( topology.bindings.exchanges[ 0 ], {
+				exchange: "topic.exchange",
+				target: "subscription.exchange",
+				pattern: "*.one"
+			} );
+			assert.deepEqual( topology.bindings.exchanges[ 1 ], {
+				exchange: "topic.exchange",
+				target: "subscription.exchange",
+				pattern: "*.two"
+			} );
+		} );
+	} );
+
+	context( "parsing subscriptions with embedded exchanges", () => {
+		beforeEach( () => {
+			topology = parser( data[ "embedded-subscriptions" ] );
+		} );
+
+		it( "should create the subscription exchange", () => {
+			assert.deepProperty( topology.exchanges, "subscription\\.exchange" );
+			assert.deepEqual( topology.exchanges[ "subscription.exchange" ], {
+				name: "subscription.exchange",
+				type: "fanout"
+			} );
+		} );
+
+		it( "should create the topic exchange", () => {
+			assert.deepProperty( topology.exchanges, "topic\\.one" );
+			assert.deepEqual( topology.exchanges[ "topic.one" ], {
+				name: "topic.one",
+				type: "topic"
+			} );
+		} );
+
+		it( "should create the exchange bindings", () => {
+			assert.deepEqual( topology.bindings.exchanges[ 0 ], {
+				exchange: "topic.one",
+				target: "subscription.exchange",
+				pattern: "*.one"
+			} );
+			assert.deepEqual( topology.bindings.exchanges[ 1 ], {
+				exchange: "topic.one",
+				target: "subscription.exchange",
+				pattern: "*.two"
+			} );
+		} );
+	} );
+
 	context( "named primitives", () => {
 		beforeEach( () => {
 			topology = parser( data[ "named-primitives" ] );

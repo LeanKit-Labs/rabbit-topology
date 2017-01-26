@@ -136,5 +136,31 @@
                 }
             }
         }
+    },
+    "subscriptions": {
+        "exchanges": {
+            "topic.exchange": {
+                "type": "topic"
+            },
+            "subscription.exchange": {
+                "type": "fanout",
+                "subscriptions": {
+                    "topic.exchange": [ "*.one", "*.two" ]
+                }
+            }
+        }
+    },
+    "embedded-subscriptions": {
+        "exchanges": {
+            "subscription.exchange": {
+                "type": "fanout",
+                "subscriptions": {
+                    "topic.one": {
+                        "type": "topic",
+                        "patterns": [ "*.one", "*.two" ]
+                    }
+                }
+            }
+        }
     }
 }

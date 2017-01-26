@@ -70,6 +70,19 @@ module.exports = ( definition ) => {
 				api.ensureBinding( "exchange", key, binding );
 			} );
 
+			_.forEach( _.get( def, "subscriptions", {} ), ( value, key ) => {
+				const target = exchange.name;
+				const topicExchange = ( key || value.name ); // may not be defined, yet
+				const patterns = _.isArray( value ) ? value : value.patterns;
+				const binding = { exchange: topicExchange, target, patterns };
+
+				if ( _.isObject( value ) ) {
+					api.ensureExchange( topicExchange, value );
+				}
+
+				api.ensureBinding( "exchange", key, binding );
+			} );
+
 			exchanges[ name ] = exchange;
 		},
 		ensureBinding( type, name, def ) {

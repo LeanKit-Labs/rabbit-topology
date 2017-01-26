@@ -9,7 +9,6 @@
     "build": "npm run clean && npm run build:run -- --ignore spec.js",
     "build:run": "babel src -d lib --source-maps inline --copy-files",
     "build:debug": "npm run clean && npm run build:run",
-    "pretest": "npm run lint",
     "test": "npm run cover",
     "test:run": "NODE_ENV=test mocha --compilers js:babel-register --timeout 5000 -r ./test/helpers/ -R spec",
     "test:all": "npm run test:run -- 'src/**/*.spec.js'",
@@ -17,7 +16,8 @@
     "cover": "nyc -r text-summary -r html -- npm run test:all",
     "cover:watch": "nodemon --exec \"npm run cover\" --watch ./src --watch ./test",
     "cover:show": "open \"file://$PWD/coverage/index.html\"",
-    "prepublish": "npm run lint && npm test && npm run build"
+    "pretest": "npm run lint",
+    "prepublish": "npm test && npm run build"
   },
   "dependencies": {
     "lodash": "^4.17.2"
