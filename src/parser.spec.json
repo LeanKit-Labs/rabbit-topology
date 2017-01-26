@@ -1,0 +1,140 @@
+{
+    "exchanges-only": {
+        "exchanges" : {
+            "defined.exchange": {
+                "type": "fanout",
+                "durable": true,
+                "internal": true,
+                "autoDelete": true,
+                "alternateExchange": "alternate.exchange",
+                "unsupported": "value",
+                "arguments": {
+                    "custom": "value"
+                }
+            }
+        }
+    },
+    "queues-only": {
+        "queues": {
+            "defined.queue": {
+                "exclusive": true,
+                "durable": true,
+                "autoDelete": true,
+                "messageTtl": 500,
+                "expires": 600,
+                "maxLength": 100,
+                "maxPriority": 1,
+                "unsupported": "value",
+                "arguments": {
+                    "custom": "value"
+                }
+            },
+            "deadletter.queue": {
+                "deadLetterExchange": "dlx",
+                "deadLetterRoutingKey": "#"
+            }
+        }
+    },
+    "bindings-only": {
+        "queues": {
+            "target.queue": {}
+        },
+        "exchanges": {
+            "target.exchange": { "type": "fanout" },
+            "target.exchange.topic": { "type": "topic" }
+        },
+        "bindings": [ {
+            "exchange": "target.exchange",
+            "target": "target.queue",
+            "patterns": [ "#", "*.message" ]
+        }, {
+            "exchange": "target.exchange",
+            "target": "target.exchange.topic"
+        } ]
+    },
+    "embedded-alt-exchange": {
+        "exchanges": {
+            "defined.exchange": {
+                "type": "fanout",
+                "alternateExchange": {
+                    "name": "alternate.exchange",
+                    "type": "fanout",
+                    "durable": true,
+                    "autoDelete": false
+                }
+            }
+        }
+    },
+    "embedded-deadletter-exchange": {
+        "queues": {
+            "defined.queue": {
+                "deadLetterExchange": {
+                    "name": "defined.dlx",
+                    "type": "fanout"
+                },
+                "deadLetterRoutingKey": "#"
+            }
+        }
+    },
+    "embedded-queue-bindings": {
+        "exchanges": {
+            "defined.exchange": {
+                "type": "fanout",
+                "bindings": {
+                    "queues": {
+                        "defined.queue": {
+                            "durable": true,
+                            "patterns": [ "*.message" ],
+                            "deadLetterExchange": {
+                                "name": "defined.dlx",
+                                "type": "fanout"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "embedded-exchange-bindings": {
+        "exchanges": {
+            "defined.exchange": {
+                "type": "fanout",
+                "bindings": {
+                    "exchanges": {
+                        "defined.exchange.topic": {
+                            "type": "topic",
+                            "durable": true,
+                            "patterns": [ "#" ]
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "named-primitives": {
+        "queues": {
+            "delivery": {
+                "name": "defined.queue"
+            }
+        },
+        "exchanges": {
+            "subscription": {
+                "name": "defined.exchange",
+                "type": "topic"
+            },
+            "nested": {
+                "name": "nested.exchange",
+                "type": "fanout",
+                "bindings": {
+                    "queues": {
+                        "ingress": {
+                            "name": "ingress.queue",
+                            "patterns": [ "#" ]
+                        },
+                        "simple": "simple.queue"
+                    }
+                }
+            }
+        }
+    }
+}
