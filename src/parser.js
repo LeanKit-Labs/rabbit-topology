@@ -1,124 +1,96 @@
 /* eslint-disable max-lines */
 const _ = require( "lodash" );
+const nodes = require( "./nodes" );
 
-const queueOptions = [
-	"exclusive", "durable", "autoDelete", "arguments",
-	"messageTtl", "expires", "maxLength", "maxPriority",
-	"prefetch"
-];
-const exchangeOptions = [
-	"durable", "internal", "autoDelete", "arguments"
-];
+function checkArray( val ) {
+	return _.isNil( val ) || _.isArray( val );
+}
 
-module.exports = ( definition ) => {
-	const exchanges = {};
-	const queues = {};
-	const bindings = { queues: [], exchanges: [] };
-	const api = {
-		ensureQueue( name, def ) {
-			if ( queues[ name ] ) {
-				return;
-			}
-			const queue = Object.assign( { name: ( def.name || name ) }, _.pick( def, queueOptions ) );
-			if ( !_.isEmpty( def.deadLetterExchange ) ) {
-				const dlx = def.deadLetterExchange;
-				if ( _.isString( dlx ) ) {
-					queue.deadLetterExchange = dlx;
-					queue.deadLetterRoutingKey = def.deadLetterRoutingKey;
-				} else {
-					api.ensureExchange( dlx.name, dlx );
-					queue.deadLetterExchange = dlx.name;
-					queue.deadLetterRoutingKey = dlx.routingKey;
-				}
-			}
-			queues[ name ] = queue;
-		},
-		ensureExchange( name, def ) {
-			if ( exchanges[ name ] ) {
-				return;
-			}
+function checkObject( val ) {
+	return _.isNil( val ) || _.isObject( val );
+}
 
-			const exchange = Object.assign( { name: ( def.name || name ), type: def.type }, _.pick( def, exchangeOptions ) );
-			if ( !_.isEmpty( def.alternateExchange ) ) {
-				const altx = def.alternateExchange;
-				if ( _.isString( altx ) ) {
-					exchange.alternateExchange = altx;
-				} else {
-					api.ensureExchange( altx.name, altx );
-					exchange.alternateExchange = altx.name;
-				}
-			}
+const api = {
+	referenceNode( key ) {
+		return new nodes.Reference( key );
+	},
+	queueBindingNode( exchangeNode, targetNode, patterns ) {
+		return new nodes.Binding( exchangeNode, targetNode, patterns, "queue" );
+	},
+	exchangeBindingNode( exchangeNode, targetNode, patterns ) {
+		return new nodes.Binding( exchangeNode, targetNode, patterns, "exchange" );
+	},
+	subscriptionNode( key, opt, targetNode ) {
+		const exchangeNode = _.isPlainObject( opt ) ?
+			api.exchangeNode( key, _.omit( opt, "patterns" ) ) :
+			api.referenceNode( key );
+		const patterns = _.isArray( opt ) ? opt : opt.patterns;
+		const bindingNode = api.exchangeBindingNode( exchangeNode, targetNode, patterns );
+		return new nodes.Subscription( bindingNode );
+	},
+	queueNode( key, opt ) {
+		const queue = new nodes.Queue( key, opt );
+		if ( !_.isEmpty( opt.deadLetterExchange ) ) {
+			const ref = _.isPlainObject( opt.deadLetterExchange ) ?
+				api.exchangeNode( opt.deadLetterExchange.name, opt.deadLetterExchange ) :
+				api.referenceNode( opt.deadLetterExchange );
+			queue.deadLetter( ref, opt.deadLetterRoutingKey );
+		}
+		return queue;
+	},
+	exchangeNode( key, opt ) {
+		const exchange = new nodes.Exchange( key, opt );
+		if ( !_.isEmpty( opt.alternateExchange ) ) {
+			const ref = _.isPlainObject( opt.alternateExchange ) ?
+				api.exchangeNode( opt.alternateExchange.name, opt.alternateExchange ) :
+				api.referenceNode( opt.alternateExchange );
+			exchange.alternate( ref );
+		}
 
-			const convertBinding = ( defn, key ) => {
-				// Conforming to: { exchange: <string>, target: <object>, patterns: <array> }
-				let target;
-				if ( _.isString( defn ) ) {
-					target = { name: defn };
-				} else {
-					target = Object.assign( { name: ( defn.name || key ) }, _.omit( defn, "patterns" ) );
-				}
-				return { exchange: exchange.name, target, patterns: defn.patterns || [ "" ] };
-			};
-
-			_.forEach( _.get( def, "queues", {} ), ( value, key ) => {
-				const binding = convertBinding( value, key );
-				api.ensureBinding( "queue", key, binding );
-			} );
-
-			_.forEach( _.get( def, "exchanges", {} ), ( value, key ) => {
-				const binding = convertBinding( value, key );
-				api.ensureBinding( "exchange", key, binding );
-			} );
-
-			_.forEach( _.get( def, "subscriptions", {} ), ( value, key ) => {
-				const target = exchange.name;
-				const topicExchange = ( key || value.name ); // may not be defined, yet
-				const patterns = _.isArray( value ) ? value : value.patterns;
-				const binding = { exchange: topicExchange, target, patterns };
-
-				if ( _.isObject( value ) ) {
-					api.ensureExchange( topicExchange, value );
-				}
-
-				api.ensureBinding( "exchange", key, binding );
-			} );
-
-			exchanges[ name ] = exchange;
-		},
-		ensureBinding( type, name, def ) {
-			def = Object.assign( { patterns: [ "" ] }, def );
-
-			let target = def.target;
-			if ( _.isObject( def.target ) ) {
-				const methodName = `ensure${ _.upperFirst( type ) }`;
-				api[ methodName ]( name, def.target );
-				target = target.name;
-			}
-
-			def.patterns.forEach( pattern => {
-				bindings[ `${ type }s` ].push( { exchange: def.exchange, target, pattern } );
+		if ( _.isPlainObject( opt.queues ) ) {
+			_.forEach( opt.queues, ( v, k ) => {
+				const isEmbedded = _.isPlainObject( v );
+				const target = isEmbedded ? api.queueNode( k, v ) : api.referenceNode( k );
+				const patterns = isEmbedded ? v.patterns : v;
+				exchange.bindQueue( api.queueBindingNode( exchange, target, patterns ) );
 			} );
 		}
-	};
 
-	_.forEach( definition.exchanges, ( def, exchangeName ) => {
-		api.ensureExchange( exchangeName, def );
-	} );
-
-	_.forEach( definition.queues, ( def, queueName ) => {
-		api.ensureQueue( queueName, def );
-	} );
-
-	_.forEach( definition.bindings, def => {
-		// If we're creating bindings at the root definition level, we need
-		// to use the target name to determine if the target is a queue or exchange.
-		const targetQueue = queues[ def.target ];
-		if ( !_.isNil( targetQueue ) ) {
-			api.ensureBinding( "queue", def.target, def );
-		} else {
-			api.ensureBinding( "exchange", def.target, def );
+		if ( _.isPlainObject( opt.exchanges ) ) {
+			_.forEach( opt.exchanges, ( v, k ) => {
+				const isEmbedded = _.isPlainObject( v );
+				const target = isEmbedded ? api.exchangeNode( k, v ) : api.referenceNode( k );
+				const patterns = isEmbedded ? v.patterns : v;
+				exchange.bindExchange( api.exchangeBindingNode( exchange, target, patterns ) );
+			} );
 		}
-	} );
 
-	return { exchanges, queues, bindings };
+		if ( _.isPlainObject( opt.subscriptions ) ) {
+			_.forEach( opt.subscriptions, ( v, k ) => exchange.subscribe( api.subscriptionNode( k, v, exchange ) ) );
+		}
+
+		return exchange;
+	}
+};
+
+// Build an AST from the domain language representation
+module.exports = ( dsl ) => {
+	checkObject( dsl.exchanges, "The 'exchanges' root definition must be a map" );
+	checkObject( dsl.queues, "The 'queues' root definition must be a map" );
+	checkArray( dsl.bindings, "The 'bindings' root definition must be an array" );
+
+	const root = [];
+	_.forEach( dsl.exchanges, ( val, key ) => root.push( api.exchangeNode( key, val ) ) );
+	_.forEach( dsl.queues, ( val, key ) => root.push( api.queueNode( key, val ) ) );
+	_.forEach( dsl.bindings, ( val, key ) => {
+		// We don't know if it's an exchange or queue binding from here.
+		// So, we will need to look it up when traversing the AST.
+		const binding = new nodes.Binding(
+			new nodes.Reference( val.exchange ),
+			new nodes.Reference( val.target ),
+			val.patterns
+		);
+		root.push( binding );
+	} );
+	return root;
 };

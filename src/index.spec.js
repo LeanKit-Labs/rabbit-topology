@@ -1,20 +1,20 @@
 /* eslint-disable max-lines, no-magic-numbers */
 /* eslint-env mocha */
-const parser = require( "./parser" );
-const data = require( "./parser.spec.json" );
+const parser = require( "./index" );
+const data = require( "./index.spec.json" );
 const { assert } = testHelpers;
 
-describe( "topologyParser", () => {
+describe( "Topology Parser", () => {
 	let topology;
 
 	context( "parsing exchanges separately", () => {
 		beforeEach( () => {
-			topology = parser( data[ "exchanges-only" ] );
+			topology = parser.parse( data[ "exchanges-only" ] );
 		} );
 
 		it( "should parse all exchanges defined", () => {
 			assert.deepEqual( topology.exchanges, {
-				"defined.exchange": {
+				fat: {
 					name: "defined.exchange",
 					type: "fanout",
 					durable: true,
@@ -22,20 +22,26 @@ describe( "topologyParser", () => {
 					autoDelete: true,
 					alternateExchange: "alternate.exchange",
 					arguments: {
-						custom: "value"
+						custom: "value",
+						canonical: true,
+						unsupported: "value"
 					}
+				},
+				minimal: {
+					name: "minimal",
+					type: "fanout"
 				}
 			} );
 		} );
 
 		it( "should not contain any extra properties", () => {
-			assert.notProperty( topology.exchanges[ "defined.exchange" ], "unsupported" );
+			assert.notProperty( topology.exchanges.fat, "unsupported" );
 		} );
 	} );
 
 	context( "parsing queues separately", () => {
 		beforeEach( () => {
-			topology = parser( data[ "queues-only" ] );
+			topology = parser.parse( data[ "queues-only" ] );
 		} );
 
 		it( "should parse the normal queue definition", () => {
@@ -49,7 +55,8 @@ describe( "topologyParser", () => {
 				maxPriority: 1,
 				messageTtl: 500,
 				arguments: {
-					custom: "value"
+					custom: "value",
+					unsupported: "value"
 				}
 			} );
 		} );
@@ -68,37 +75,61 @@ describe( "topologyParser", () => {
 	} );
 
 	context( "parsing bindings separately", () => {
-		beforeEach( () => {
-			topology = parser( data[ "bindings-only" ] );
+		context( "given normal, unique bindings", () => {
+			beforeEach( () => {
+				topology = parser.parse( data[ "bindings-only" ] );
+			} );
+
+			it( "should parse the queue binding", () => {
+				assert.lengthOf( topology.bindings.queues, 2 );
+				assert.deepEqual( topology.bindings.queues[ 0 ], {
+					exchange: "target.exchange",
+					target: "target.queue",
+					pattern: "#"
+				} );
+				assert.deepEqual( topology.bindings.queues[ 1 ], {
+					exchange: "target.exchange",
+					target: "target.queue",
+					pattern: "*.message"
+				} );
+			} );
+
+			it( "should parse the exchange binding", () => {
+				assert.lengthOf( topology.bindings.exchanges, 1 );
+				assert.deepEqual( topology.bindings.exchanges[ 0 ], {
+					exchange: "target.exchange",
+					target: "target.exchange.topic",
+					pattern: ""
+				} );
+			} );
 		} );
 
-		it( "should parse the queue binding", () => {
-			assert.lengthOf( topology.bindings.queues, 2 );
-			assert.deepEqual( topology.bindings.queues[ 0 ], {
-				exchange: "target.exchange",
-				target: "target.queue",
-				pattern: "#"
+		context( "given duplicate bindings", () => {
+			beforeEach( () => {
+				topology = parser.parse( data[ "bindings-only-duplicates" ] );
 			} );
-			assert.deepEqual( topology.bindings.queues[ 1 ], {
-				exchange: "target.exchange",
-				target: "target.queue",
-				pattern: "*.message"
+
+			it( "should parse only one binding", () => {
+				assert.lengthOf( topology.bindings.queues, 1 );
 			} );
 		} );
 
-		it( "should parse the exchange binding", () => {
-			assert.lengthOf( topology.bindings.exchanges, 1 );
-			assert.deepEqual( topology.bindings.exchanges[ 0 ], {
-				exchange: "target.exchange",
-				target: "target.exchange.topic",
-				pattern: ""
+		context( "given root bindings referencing undefined queues", () => {
+			it( "should throw an error", () => {
+				assert.throws( () => parser.parse( data[ "bindings-missing-queues" ] ) );
+			} );
+		} );
+
+		context( "given root bindings referencing undefined exchanges", () => {
+			it( "should throw an error", () => {
+				assert.throws( () => parser.parse( data[ "bindings-missing-exchanges" ] ) );
 			} );
 		} );
 	} );
 
 	context( "parsing embedded alternate exchanges", () => {
 		beforeEach( () => {
-			topology = parser( data[ "embedded-alt-exchange" ] );
+			topology = parser.parse( data[ "embedded-alt-exchange" ] );
 		} );
 
 		it( "should create the alternate exchange", () => {
@@ -113,7 +144,7 @@ describe( "topologyParser", () => {
 
 	context( "parsing embedded dead letter exchanges", () => {
 		beforeEach( () => {
-			topology = parser( data[ "embedded-deadletter-exchange" ] );
+			topology = parser.parse( data[ "embedded-deadletter-exchange" ] );
 		} );
 
 		it( "should create the dead-letter exchange", () => {
@@ -126,7 +157,7 @@ describe( "topologyParser", () => {
 
 	context( "parsing embedded queue bindings", () => {
 		beforeEach( () => {
-			topology = parser( data[ "embedded-queue-bindings" ] );
+			topology = parser.parse( data[ "embedded-queue-bindings" ] );
 		} );
 
 		it( "should create the embedded queue from the binding", () => {
@@ -147,18 +178,26 @@ describe( "topologyParser", () => {
 			} );
 		} );
 
-		it( "should create the queue binding", () => {
+		it( "should create the queue binding for the embedded queue", () => {
 			assert.deepEqual( topology.bindings.queues[ 0 ], {
 				exchange: "defined.exchange",
 				target: "defined.queue",
 				pattern: "*.message"
 			} );
 		} );
+
+		it( "should create the queue binding for the referenced queue", async () => {
+			assert.deepEqual( topology.bindings.queues[ 1 ], {
+				exchange: "defined.exchange",
+				target: "referenced.queue",
+				pattern: "#"
+			} );
+		} );
 	} );
 
 	context( "parsing embedded exchange bindings", () => {
 		beforeEach( () => {
-			topology = parser( data[ "embedded-exchange-bindings" ] );
+			topology = parser.parse( data[ "embedded-exchange-bindings" ] );
 		} );
 
 		it( "should create the embedded exchange from the binding", () => {
@@ -170,10 +209,18 @@ describe( "topologyParser", () => {
 			} );
 		} );
 
-		it( "should create the exchange binding", () => {
+		it( "should create the exchange binding for the embedded exchange", () => {
 			assert.deepEqual( topology.bindings.exchanges[ 0 ], {
 				exchange: "defined.exchange",
 				target: "defined.exchange.topic",
+				pattern: "#"
+			} );
+		} );
+
+		it( "should create the exchange binding for the reference", async () => {
+			assert.deepEqual( topology.bindings.exchanges[ 1 ], {
+				exchange: "defined.exchange",
+				target: "referenced.exchange",
 				pattern: "#"
 			} );
 		} );
@@ -181,7 +228,7 @@ describe( "topologyParser", () => {
 
 	context( "parsing subscriptions", () => {
 		beforeEach( () => {
-			topology = parser( data.subscriptions );
+			topology = parser.parse( data.subscriptions );
 		} );
 
 		it( "should create the subscription exchange", () => {
@@ -216,7 +263,7 @@ describe( "topologyParser", () => {
 
 	context( "parsing subscriptions with embedded exchanges", () => {
 		beforeEach( () => {
-			topology = parser( data[ "embedded-subscriptions" ] );
+			topology = parser.parse( data[ "embedded-subscriptions" ] );
 		} );
 
 		it( "should create the subscription exchange", () => {
@@ -251,7 +298,7 @@ describe( "topologyParser", () => {
 
 	context( "named primitives", () => {
 		beforeEach( () => {
-			topology = parser( data[ "named-primitives" ] );
+			topology = parser.parse( data[ "named-primitives" ] );
 		} );
 
 		it( "should create an index-named queue", () => {
@@ -274,9 +321,8 @@ describe( "topologyParser", () => {
 			assert.deepEqual( topology.queues.ingress, { name: "ingress.queue" } );
 		} );
 
-		it( "should create an index-named queue for the embedded simple queue", () => {
-			assert.deepProperty( topology.queues, "simple" );
-			assert.deepEqual( topology.queues.simple, { name: "simple.queue" } );
+		it( "should not create an index-named queue for the referenced simple queue", () => {
+			assert.notProperty( topology.queues, "simple" );
 		} );
 	} );
 } );
