@@ -1,17 +1,20 @@
 {
     "exchanges-only": {
         "exchanges" : {
-            "defined.exchange": {
+            "fat": {
                 "type": "fanout",
+                "name": "defined.exchange",
                 "durable": true,
                 "internal": true,
                 "autoDelete": true,
                 "alternateExchange": "alternate.exchange",
                 "unsupported": "value",
+                "canonical": true,
                 "arguments": {
                     "custom": "value"
                 }
-            }
+            },
+            "minimal": {}
         }
     },
     "queues-only": {
@@ -52,6 +55,34 @@
             "target": "target.exchange.topic"
         } ]
     },
+    "bindings-only-duplicates": {
+        "queues": { "q": {} },
+        "exchanges": { "x": {} },
+        "bindings": [ {
+            "exchange": "x",
+            "target": "q",
+            "patterns": [ "#" ]
+        }, {
+            "exchange": "x",
+            "target": "q",
+            "patterns": [ "#" ]
+        } ]
+    },
+    "bindings-missing-queues": {
+        "exchanges": { "x": {} },
+        "bindings": [ {
+            "exchange": "x",
+            "target": "q",
+            "patterns": [ "#" ]
+        } ]
+    },
+    "bindings-missing-exchanges": {
+        "bindings": [ {
+            "exchange": "x",
+            "target": "x2",
+            "patterns": [ "#" ]
+        } ]
+    },
     "embedded-alt-exchange": {
         "exchanges": {
             "defined.exchange": {
@@ -88,7 +119,8 @@
                             "name": "defined.dlx",
                             "type": "fanout"
                         }
-                    }
+                    },
+                    "referenced.queue": [ "#" ]
                 }
             }
         }
@@ -102,7 +134,8 @@
                         "type": "topic",
                         "durable": true,
                         "patterns": [ "#" ]
-                    }
+                    },
+                    "referenced.exchange": [ "#" ]
                 }
             }
         }
@@ -126,7 +159,7 @@
                         "name": "ingress.queue",
                         "patterns": [ "#" ]
                     },
-                    "simple": "simple.queue"
+                    "simple": [ "#" ]
                 }
             }
         }
@@ -152,6 +185,24 @@
                     "topic.one": {
                         "type": "topic",
                         "patterns": [ "*.one", "*.two" ]
+                    }
+                }
+            }
+        }
+    },
+    "canonical-exchange-subscriptions": {
+        "exchanges": {
+            "topic-exchange": {},
+            "subscribing-exchange": {
+                "type": "fanout",
+                "canonical": true,
+                "subscriptions": {
+                    "topic-exchange": {
+                        "type": "topic",
+                        "patterns": [
+                            "events.#",
+                            "errors.#"
+                        ]
                     }
                 }
             }

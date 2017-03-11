@@ -6,19 +6,18 @@
   "scripts": {
     "lint": "eslint ./src",
     "clean": "rm -rf ./lib && rm -rf .nyc_output && rm -rf coverage",
-    "build": "npm run clean && npm run build:run -- --ignore spec.js",
-    "build:run": "babel src -d lib --source-maps inline --copy-files",
-    "build:debug": "npm run clean && npm run build:run",
+    "build": "npm run clean && babel src --out-dir lib --source-maps inline --copy-files --ignore spec.js",
+    "build:test": "npm run clean && babel test --out-dir lib/test --source-maps inline --copy-files && babel src --out-dir lib/src --source-maps inline --copy-files",
+    "build:watch": "npm run build -- --watch",
+    "pretest": "npm run lint",
     "test": "npm run coveralls",
     "test:run": "NODE_ENV=test mocha --compilers js:babel-register --timeout 5000 -r ./test/helpers/ -R spec",
     "test:all": "npm run test:run -- 'src/**/*.spec.js'",
-    "test:watch": "npm run test:all -- -w",
     "cover": "nyc -r text-summary -r html -- npm run test:all",
     "coveralls": "nyc npm run test:all && nyc report -r text-lcov | coveralls",
     "cover:watch": "nodemon --exec \"npm run cover\" --watch ./src --watch ./test",
     "cover:show": "open \"file://$PWD/coverage/index.html\"",
-    "pretest": "npm run lint",
-    "prepublish": "npm test && npm run build"
+    "prepublish": "npm run lint && npm run build && npm run cover"
   },
   "dependencies": {
     "lodash": "^4.17.2"
