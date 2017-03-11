@@ -1,3 +1,10 @@
+## 3.x
+
+### 3.0.0
+
+* Support a better parsing engine
+* Support debugging in VSCode
+
 ## 2.x
 
 ### 2.0.1
